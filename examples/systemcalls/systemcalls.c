@@ -1,3 +1,9 @@
+#include <stdlib.h>
+#include <sys/wait.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <linux/fs.h>
 #include "systemcalls.h"
 
 /**
@@ -16,8 +22,16 @@ bool do_system(const char *cmd)
  *   and return a boolean true if the system() call completed with success
  *   or false() if it returned a failure
 */
+	pid_t ret;
+	
+	ret = system(cmd);
+	
+	if(WIFEXITED(ret) && !WEXITSTATUS(ret)) {
+		return true;
+	} else {
+		return false;
+	}
 
-    return true;
 }
 
 /**
@@ -59,9 +73,54 @@ bool do_exec(int count, ...)
  *
 */
 
-    va_end(args);
+	pid_t pid;
+	
+	int status;
+	bool ret = false;
+	
+	
+	pid = fork();
+	
+	/* error */
+	if(pid == -1)
+		perror("fork");
+	
+	/* Child */
+	if(!pid) {
+		
+		//int execv(const char *pathname, char *const argv[]);
+		status = execv(command[0], command);
+		
+		// exec only returns on error
+		if(status == -1) {
+			perror("execv");
+			exit(1);
+		}
+		
+	}
 
-    return true;
+
+	/* Parent */
+	if(pid > 0) {
+		
+		pid = wait(&status);
+		
+		if(pid == -1) {
+			perror("wait");
+		} else {
+			// Check exit status
+			if(!WEXITSTATUS(status)) {
+				printf("Wait status success: %d\n",WEXITSTATUS(status));
+				ret = true;
+			} else {
+				printf("Wait status fail: %d\n",WEXITSTATUS(status));
+			}
+		}
+	}
+	
+    va_end(args);
+	printf("return is: %s\n",ret ? "true":"false");
+    return ret;
 }
 
 /**
@@ -93,7 +152,60 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *
 */
 
+	pid_t pid;
+	
+	int status;
+	bool ret = false;
+	
+	pid = fork();
+	
+	// Both parent and child will had this fd
+	int fd = open(outputfile, O_WRONLY|O_TRUNC|O_CREAT, 0644);
+	
+	/* error */
+	if(pid == -1)
+		perror("fork");
+	
+	/* Child */
+	if(!pid) {
+		
+		// Redirect std out to file
+		if (dup2(fd, 1) < 0) { perror("dup2"); return false; }
+		close(fd);
+		
+		//int execv(const char *pathname, char *const argv[]);
+		status = execv(command[0], command);
+		
+		// exec only returns on error
+		if(status == -1) {
+			perror("execv");
+			exit(1);
+		}
+		
+	}
+	
+	/* Parent */
+	if(pid > 0) {
+		
+		pid = wait(&status);
+		
+		if(pid == -1) {
+			perror("wait");
+		} else {
+			// Check exit status
+			if(!WEXITSTATUS(status)) {
+				printf("Wait status success: %d\n",WEXITSTATUS(status));
+				ret = true;
+			} else {
+				printf("Wait status fail: %d\n",WEXITSTATUS(status));
+			}
+		}
+		
+		// Close parent fd
+		close(fd);
+		
+	}
+	
     va_end(args);
-
-    return true;
+    return ret;
 }
