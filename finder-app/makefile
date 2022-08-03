@@ -3,13 +3,10 @@
 # ==========================================
 
 #We try to detect the OS we are running on, and adjust commands as needed
-TOOLCHAIN_PFX=aarch64-none-linux-gnu-
 C_COMPILER=gcc
 
-COMPILER=$(C_COMPILER)
-
 ifdef CROSS_COMPILE 
-COMPILER=$(TOOLCHAIN_PFX)$(C_COMPILER)
+COMPILER=$(CROSS_COMPILE)$(C_COMPILER)
 else
 COMPILER=$(C_COMPILER)
 endif
